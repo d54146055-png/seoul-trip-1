@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { ItineraryItem, ParsedLocation } from "../types";
 
@@ -42,9 +43,6 @@ export const generateItinerarySuggestion = async (day: number, context: string, 
     });
 
     const items = JSON.parse(response.text || "[]");
-    // We don't generate IDs here anymore as Firestore will assign them, 
-    // but the UI might need temp ones if we weren't using Firestore directly. 
-    // For now, we return plain objects.
     return items.map((item: any) => ({
       ...item,
       day
@@ -88,6 +86,35 @@ export const parseLocationsFromText = async (text: string): Promise<ParsedLocati
   }
 };
 
+export const parseActivityFromText = async (text: string): Promise<Partial<ItineraryItem>> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Analyze this text and extract a single travel itinerary activity item.
+      Text: "${text}"
+      If no specific time is mentioned, suggest a logical time (e.g. 10:00 or 14:00).
+      Return JSON.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            time: { type: Type.STRING },
+            activity: { type: Type.STRING },
+            location: { type: Type.STRING },
+            notes: { type: Type.STRING }
+          },
+          required: ["activity", "location", "time"]
+        }
+      }
+    });
+    return JSON.parse(response.text || "{}");
+  } catch (e) {
+    console.error("Parse activity error", e);
+    return { activity: "New Activity", time: "10:00" };
+  }
+}
+
 export const chatWithTravelGuide = async (
   message: string, 
   location?: { lat: number; lng: number }
@@ -113,20 +140,16 @@ export const chatWithTravelGuide = async (
     });
 
     // Extract grounding chunks for map links
-    // The SDK types might be loose, so we safely access the path
-    // @ts-ignore - groundingMetadata types can be tricky in preview
+    // @ts-ignore
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
     
     const mapLinks = groundingChunks
       .map((chunk: any) => {
         if (chunk.web) return { source: chunk.web };
-        // Maps grounding often returns chunks in a specific structure, we standardize here
-        // If it's a maps chunk, it usually has a source structure
         return null;
       })
       .filter((l: any) => l !== null);
 
-    // If strictly maps grounding chunks are different:
     const specificMapChunks = groundingChunks
         .filter((c: any) => c.maps?.placeAnswerSources?.length > 0)
         .flatMap((c: any) => c.maps.placeAnswerSources.map((s: any) => ({

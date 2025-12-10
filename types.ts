@@ -1,3 +1,4 @@
+
 export interface WeatherInfo {
   temp: number;
   condition: string; // 'sunny', 'cloudy', 'rainy', 'snowy'
@@ -26,6 +27,7 @@ export interface Expense {
 }
 
 export interface User {
+  id: string;
   name: string;
 }
 
@@ -33,6 +35,7 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
   text: string;
+  timestamp: number;
   isLoading?: boolean;
   mapChunks?: Array<{
     source: {
