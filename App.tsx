@@ -1,14 +1,20 @@
+
 import React, { useState, useEffect } from 'react';
 import { AppTab, Expense, ItineraryItem, User } from './types';
 import ItineraryView from './components/ItineraryView';
 import ExpenseView from './components/ExpenseView';
 import ChatView from './components/ChatView';
 import MapView from './components/MapView';
-import { Calendar, CreditCard, MessageCircle, MapPin, Compass, CloudOff } from 'lucide-react';
-import { subscribeToExpenses, subscribeToItinerary, subscribeToUsers } from './services/firebaseService';
-import { isFirebaseConfigured } from './firebaseConfig';
+import LoginView from './components/LoginView';
+import { Calendar, CreditCard, MessageCircle, MapPin, Compass, LogOut } from 'lucide-react';
+import { subscribeToExpenses, subscribeToItinerary, subscribeToUsers, checkAndCreateUser } from './services/firebaseService';
+import { subscribeToAuthChanges, logout } from './services/authService';
+import { User as FirebaseUser } from 'firebase/auth';
 
 const App: React.FC = () => {
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  
   const [activeTab, setActiveTab] = useState<AppTab>(AppTab.ITINERARY);
   
   // Real-time Data from Firebase
@@ -16,46 +22,41 @@ const App: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [users, setUsers] = useState<User[]>([]);
 
+  // 1. Handle Authentication
   useEffect(() => {
-    // Setup listeners
-    const unsubscribeItinerary = subscribeToItinerary((items) => {
-      setItineraryItems(items);
+    const unsubscribe = subscribeToAuthChanges(async (currentUser) => {
+        setUser(currentUser);
+        if (currentUser) {
+            // Sync this user to the trip database
+            await checkAndCreateUser({
+                displayName: currentUser.displayName,
+                photoURL: currentUser.photoURL,
+                uid: currentUser.uid
+            });
+        }
+        setAuthLoading(false);
     });
+    return () => unsubscribe();
+  }, []);
 
-    const unsubscribeExpenses = subscribeToExpenses((items) => {
-      setExpenses(items);
-    });
+  // 2. Handle Data Sync (Only if logged in)
+  useEffect(() => {
+    if (!user) return;
 
-    const unsubscribeUsers = subscribeToUsers((items) => {
-      setUsers(items);
-    });
-
-    // Initialize default users for demo if empty in local mode
-    if (!isFirebaseConfigured) {
-        // Give the UI a moment to check local storage
-        setTimeout(() => {
-            const localUsers = localStorage.getItem('seoul_users_seoul-trip-demo');
-            if (!localUsers || JSON.parse(localUsers).length === 0) {
-                 localStorage.setItem('seoul_users_seoul-trip-demo', JSON.stringify([
-                     { id: '1', name: 'You' },
-                     { id: '2', name: 'Friend' }
-                 ]));
-                 window.dispatchEvent(new Event('local-storage-update'));
-            }
-        }, 500);
-    }
+    const unsubscribeItinerary = subscribeToItinerary(setItineraryItems);
+    const unsubscribeExpenses = subscribeToExpenses(setExpenses);
+    const unsubscribeUsers = subscribeToUsers(setUsers);
 
     return () => {
       unsubscribeItinerary();
       unsubscribeExpenses();
       unsubscribeUsers();
     };
-  }, []);
+  }, [user]);
 
   const renderContent = () => {
     switch (activeTab) {
       case AppTab.ITINERARY:
-        // Pass read-only items, manipulation happens via service calls inside component
         return <ItineraryView items={itineraryItems} />;
       case AppTab.MAP:
         return <MapView />;
@@ -68,6 +69,21 @@ const App: React.FC = () => {
     }
   };
 
+  // Loading Screen
+  if (authLoading) {
+    return (
+        <div className="h-full w-full bg-cream flex items-center justify-center">
+            <Compass size={48} className="text-cocoa animate-spin" />
+        </div>
+    );
+  }
+
+  // Not Logged In
+  if (!user) {
+      return <LoginView />;
+  }
+
+  // Main App
   return (
     <div className="h-full flex flex-col bg-cream text-cocoa font-sans max-w-md mx-auto relative shadow-2xl border-x border-sand/50 overflow-hidden">
       {/* Header - Fixed */}
@@ -79,21 +95,32 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2 mt-1">
              <div className="flex -space-x-1">
                 {users.slice(0, 3).map((u, i) => (
-                    <div key={i} className="w-4 h-4 rounded-full bg-latte border border-cream text-[8px] flex items-center justify-center text-white uppercase">{u.name.charAt(0)}</div>
+                    <div key={i} className="w-4 h-4 rounded-full bg-latte border border-cream text-[8px] flex items-center justify-center text-white uppercase overflow-hidden">
+                        {/* Try to use avatar if available, else initial */}
+                        {/* We don't have avatars in User type yet, but logic is ready for future */}
+                        {u.name.charAt(0)}
+                    </div>
                 ))}
              </div>
-             <p className="text-[10px] text-latte font-bold tracking-[0.2em] uppercase">{users.length > 1 ? 'Shared Trip' : 'Travel Companion'}</p>
+             <p className="text-[10px] text-latte font-bold tracking-[0.2em] uppercase">{users.length > 1 ? 'Shared Trip' : 'My Trip'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 pt-2">
-            {!isFirebaseConfigured && (
-                <div className="flex items-center text-[10px] bg-sand/30 px-2 py-1 rounded-full text-cocoa/50 font-bold" title="Demo Mode (Local Storage)">
-                    <CloudOff size={12} className="mr-1" />
-                    Offline
+            {/* User Avatar / Logout */}
+            <div className="relative group">
+                <button className="w-9 h-9 rounded-full bg-white border border-sand flex items-center justify-center shadow-sm overflow-hidden">
+                    {user.photoURL ? (
+                        <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                        <span className="text-cocoa font-bold">{user.displayName?.charAt(0)}</span>
+                    )}
+                </button>
+                {/* Dropdown for Logout */}
+                <div className="absolute right-0 top-10 w-32 bg-white rounded-xl shadow-xl p-1 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity z-50">
+                    <button onClick={logout} className="w-full text-left px-3 py-2 text-xs font-bold text-red-400 hover:bg-red-50 rounded-lg flex items-center">
+                        <LogOut size={12} className="mr-2"/> Sign Out
+                    </button>
                 </div>
-            )}
-            <div className="w-9 h-9 rounded-full bg-white border border-sand flex items-center justify-center shadow-sm">
-                <Compass size={18} className="text-cocoa" />
             </div>
         </div>
       </header>
