@@ -2,20 +2,20 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ItineraryItem, ParsedLocation } from "../types";
 
-const apiKey = process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
+// Fixed: Strictly following guidelines for GoogleGenAI initialization
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-export const generateItinerarySuggestion = async (day: number, context: string, areas?: string): Promise<ItineraryItem[]> => {
+export const generateItinerarySuggestion = async (day: number, context: string, areas?: string): Promise<Omit<ItineraryItem, 'id'>[]> => {
   try {
     const areaPrompt = areas ? `Specifically focusing on these areas/districts: ${areas}. Arrange the route logically to minimize travel time between these districts.` : '';
     
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: `Suggest a realistic 1-day itinerary for Day ${day} of a trip to Seoul, South Korea. 
       ${areaPrompt}
       Context/Vibe: ${context}.
       Include estimated weather for this time of year (Spring/Autumn usually best).
-      Return a JSON array.`,
+      Return a JSON array of activities with times.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -56,11 +56,11 @@ export const generateItinerarySuggestion = async (day: number, context: string, 
 export const parseLocationsFromText = async (text: string): Promise<ParsedLocation[]> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Extract all travel locations/places mentioned in this text. 
-      For each location, estimate its latitude and longitude coordinates in Seoul. 
+      model: "gemini-3-flash-preview",
+      contents: `Extract all travel locations/places in Seoul mentioned in this text. 
+      For each location, provide coordinates.
       Return a JSON array. 
-      Text: "${text.substring(0, 5000)}"`, // Limit text length
+      Text: "${text.substring(0, 5000)}"`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -71,7 +71,7 @@ export const parseLocationsFromText = async (text: string): Promise<ParsedLocati
               name: { type: Type.STRING },
               lat: { type: Type.NUMBER },
               lng: { type: Type.NUMBER },
-              description: { type: Type.STRING, description: "Brief snippet about what to do here based on text" }
+              description: { type: Type.STRING, description: "Brief snippet about this place" }
             },
             required: ["name", "lat", "lng"]
           }
@@ -86,13 +86,48 @@ export const parseLocationsFromText = async (text: string): Promise<ParsedLocati
   }
 };
 
+export interface RouteOption {
+  type: 'subway' | 'bus' | 'walk';
+  duration: string;
+  summary: string;
+}
+
+export const calculateRoute = async (from: string, to: string): Promise<RouteOption[]> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `As a Seoul travel expert, estimate the travel time and best routes from "${from}" to "${to}" within Seoul. 
+      Provide 3 options: one for Subway, one for Bus, and one for Walking. 
+      Return a JSON array of route options.`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              type: { type: Type.STRING, description: "Must be 'subway', 'bus', or 'walk'" },
+              duration: { type: Type.STRING, description: "Estimated time, e.g., '15 mins'" },
+              summary: { type: Type.STRING, description: "Short description, e.g., 'Line 4 (Blue)' or 'Direct walk'" }
+            },
+            required: ["type", "duration", "summary"]
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || "[]");
+  } catch (e) {
+    console.error("Route calculation error:", e);
+    return [];
+  }
+};
+
 export const parseActivityFromText = async (text: string): Promise<Partial<ItineraryItem>> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `Analyze this text and extract a single travel itinerary activity item.
+      model: "gemini-3-flash-preview",
+      contents: `Analyze this text and extract a single travel itinerary activity item for a trip to Seoul.
       Text: "${text}"
-      If no specific time is mentioned, suggest a logical time (e.g. 10:00 or 14:00).
       Return JSON.`,
       config: {
         responseMimeType: "application/json",
@@ -110,7 +145,6 @@ export const parseActivityFromText = async (text: string): Promise<Partial<Itine
     });
     return JSON.parse(response.text || "{}");
   } catch (e) {
-    console.error("Parse activity error", e);
     return { activity: "New Activity", time: "10:00" };
   }
 }
@@ -120,52 +154,43 @@ export const chatWithTravelGuide = async (
   location?: { lat: number; lng: number }
 ) => {
   try {
-    const toolConfig = location ? {
-      retrievalConfig: {
-        latLng: {
-          latitude: location.lat,
-          longitude: location.lng
-        }
-      }
-    } : undefined;
+    // Fixed: Incorporating user location into the prompt for context and extracting grounding chunks
+    const prompt = location 
+      ? `(User is currently at ${location.lat}, ${location.lng}) ${message}`
+      : message;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: message,
+      model: "gemini-3-flash-preview",
+      contents: prompt,
       config: {
-        systemInstruction: "You are a savvy local guide for Seoul, South Korea. You help tourists find great food, transport, and hidden gems. Keep answers concise and helpful for mobile users.",
-        tools: [{ googleMaps: {} }],
-        toolConfig: toolConfig,
+        systemInstruction: `You are a savvy local guide for Seoul, South Korea. 
+        Focus on providing details that work well with Naver Maps. 
+        You help tourists find great food, transport, and hidden gems. 
+        Be extremely helpful and concise.`,
+        tools: [{ googleSearch: {} }],
       }
     });
 
-    // Extract grounding chunks for map links
-    // @ts-ignore
+    // Extract grounding chunks as required for googleSearch tool
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    
-    const mapLinks = groundingChunks
-      .map((chunk: any) => {
-        if (chunk.web) return { source: chunk.web };
-        return null;
-      })
-      .filter((l: any) => l !== null);
-
-    const specificMapChunks = groundingChunks
-        .filter((c: any) => c.maps?.placeAnswerSources?.length > 0)
-        .flatMap((c: any) => c.maps.placeAnswerSources.map((s: any) => ({
-             source: { title: s.placeName || 'View on Map', uri: s.googleMapsUri || '#' } 
-        })));
-
+    const mapChunks = groundingChunks
+      .filter((chunk: any) => chunk.web)
+      .map((chunk: any) => ({
+        source: {
+          title: chunk.web.title || "Web Reference",
+          uri: chunk.web.uri
+        }
+      }));
 
     return {
-      text: response.text,
-      mapChunks: [...mapLinks, ...specificMapChunks]
+      text: response.text || "",
+      mapChunks: mapChunks
     };
 
   } catch (error) {
-    console.error("Gemini Chat Error:", error);
+    console.error("Chat Error:", error);
     return {
-      text: "Sorry, I'm having trouble connecting to the travel network right now. Please try again.",
+      text: "抱歉，我現在無法連接首爾導覽網路。請再試一次。",
       mapChunks: []
     };
   }

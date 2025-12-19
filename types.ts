@@ -52,6 +52,14 @@ export interface ParsedLocation {
   description: string;
 }
 
+export interface MapMarker extends ParsedLocation {
+  id: string;
+  type: 'search' | 'itinerary';
+  time?: string;
+  day?: number;
+  timestamp: number;
+}
+
 export enum AppTab {
   ITINERARY = 'ITINERARY',
   MAP = 'MAP',

@@ -34,7 +34,7 @@ const App: React.FC = () => {
       case AppTab.ITINERARY:
         return <ItineraryView items={itineraryItems} />;
       case AppTab.MAP:
-        return <MapView />;
+        return <MapView itineraryItems={itineraryItems} />;
       case AppTab.EXPENSES:
         return <ExpenseView expenses={expenses} users={users} />;
       case AppTab.AI_GUIDE:
