@@ -21,7 +21,7 @@ const firebaseConfig = {
 // We check for "YOUR_API_KEY" (placeholder) or empty string
 export const isFirebaseConfigured = 
   firebaseConfig.apiKey && 
-  firebaseConfig.apiKey !== "AIzaSyBPO5xK6-eFgItWQIEbYwsrUc3ZdAiq_y4" && 
+  firebaseConfig.apiKey !== "YOUR_API_KEY" && 
   firebaseConfig.apiKey !== "";
 
 let app;
