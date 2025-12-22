@@ -8,12 +8,13 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 // Go to Firebase Console -> Project Settings -> General -> Your apps
 // ==================================================================
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "SENDER_ID",
-  appId: "APP_ID"
+ apiKey: "AIzaSyBPO5xK6-eFgItWQIEbYwsrUc3ZdAiq_y4",
+  authDomain: "seoultriphavefun.firebaseapp.com",
+  projectId: "seoultriphavefun",
+  storageBucket: "seoultriphavefun.firebasestorage.app",
+  messagingSenderId: "677388619970",
+  appId: "1:677388619970:web:40a53b51773c037881ab5b",
+  measurementId: "G-CN8MM3SEQ2"
 };
 
 // Check if config is actually set and valid
