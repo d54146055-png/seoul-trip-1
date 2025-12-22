@@ -8,21 +8,20 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 // Go to Firebase Console -> Project Settings -> General -> Your apps
 // ==================================================================
 const firebaseConfig = {
- apiKey: "AIzaSyBPO5xK6-eFgItWQIEbYwsrUc3ZdAiq_y4",
-  authDomain: "seoultriphavefun.firebaseapp.com",
-  projectId: "seoultriphavefun",
-  storageBucket: "seoultriphavefun.firebasestorage.app",
-  messagingSenderId: "677388619970",
-  appId: "1:677388619970:web:40a53b51773c037881ab5b",
-  measurementId: "G-CN8MM3SEQ2"
+ apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-// Check if config is actually set and valid
-// We check for "YOUR_API_KEY" (placeholder) or empty string
+
+// 修改後的判斷邏輯
 export const isFirebaseConfigured = 
-  firebaseConfig.apiKey && 
-  firebaseConfig.apiKey !== "YOUR_API_KEY" && 
-  firebaseConfig.apiKey !== "";
+  !!import.meta.env.VITE_FIREBASE_API_KEY && 
+  import.meta.env.VITE_FIREBASE_API_KEY !== "";
 
 let app;
 let db: any;
