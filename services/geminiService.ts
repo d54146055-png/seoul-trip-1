@@ -15,7 +15,7 @@ export const generateItinerarySuggestion = async (day: number, context: string, 
     const areaPrompt = areas ? `Specifically focusing on these areas/districts: ${areas}. Arrange the route logically to minimize travel time between these districts.` : '';
     
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: `Suggest a realistic 1-day itinerary for Day ${day} of a trip to Seoul, South Korea. 
       ${areaPrompt}
       Context/Vibe: ${context}.
