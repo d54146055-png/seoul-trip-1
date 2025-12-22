@@ -61,7 +61,7 @@ export const generateItinerarySuggestion = async (day: number, context: string, 
 export const parseLocationsFromText = async (text: string): Promise<ParsedLocation[]> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: `Extract all travel locations/places in Seoul mentioned in this text. 
       For each location, provide coordinates.
       Return a JSON array. 
@@ -100,7 +100,7 @@ export interface RouteOption {
 export const calculateRoute = async (from: string, to: string): Promise<RouteOption[]> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: `As a Seoul travel expert, estimate the travel time and best routes from "${from}" to "${to}" within Seoul. 
       Provide 3 options: one for Subway, one for Bus, and one for Walking. 
       Return a JSON array of route options.`,
@@ -130,7 +130,7 @@ export const calculateRoute = async (from: string, to: string): Promise<RouteOpt
 export const parseActivityFromText = async (text: string): Promise<Partial<ItineraryItem>> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: `Analyze this text and extract a single travel itinerary activity item for a trip to Seoul.
       Text: "${text}"
       Return JSON.`,
@@ -165,7 +165,7 @@ export const chatWithTravelGuide = async (
       : message;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         systemInstruction: `You are a savvy local guide for Seoul, South Korea. 
