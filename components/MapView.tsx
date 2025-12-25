@@ -227,17 +227,28 @@ const MapView: React.FC<Props> = ({ itineraryItems = [] }) => {
   const handleBulkProcess = async () => {
     if (!bulkInput.trim()) return;
     setIsProcessing(true);
-    const results = await parseLocationsFromText(bulkInput);
-    for (const r of results) {
-      await addMapMarker({
-        ...r,
-        type: 'search',
-        timestamp: Date.now()
-      });
+    try {
+      const results = await parseLocationsFromText(bulkInput);
+      if (results.length > 0) {
+         for (const r of results) {
+            await addMapMarker({
+               ...r,
+               type: 'search',
+               timestamp: Date.now()
+            });
+         }
+         setShowBulkInput(false);
+         setBulkInput('');
+         alert(`成功標記 ${results.length} 個地點！`);
+      } else {
+         alert("AI 無法識別文字中的地點。");
+      }
+    } catch (error: any) {
+       console.error("批次處理失敗:", error);
+       alert(`批次處理錯誤: ${error.message}`);
+    } finally {
+       setIsProcessing(false);
     }
-    setIsProcessing(false);
-    setShowBulkInput(false);
-    setBulkInput('');
   };
 
   const handleCalculateRoute = async () => {
