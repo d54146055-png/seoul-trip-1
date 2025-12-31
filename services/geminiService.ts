@@ -2,7 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ItineraryItem, ParsedLocation } from "../types";
 
-const API_KEY = import.meta.env.NEXT_GEMINI_API_KEY;
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 if (!API_KEY) {
   console.error("Gemini API Key is missing! Please check Vercel environment variables.");
 }
